@@ -27,7 +27,6 @@ public class FasFileReader : IDisposable
     private const string LTFAS_FILE_SIGNATURE = "AutoCAD LT OEM Product";
     private const string FSL_FILE_SIGNATURE = "1Y";
 
-    private BinaryStreamReader? _reader;
     private byte[] _fileData = Array.Empty<byte>();
     private long _position;
     private bool _disposed;
@@ -240,13 +239,25 @@ public class FasFileReader : IDisposable
         Console.WriteLine($"[FasFileReader] Detected version: {Version}");
 
         // Load function stream first (as in original VB6 code)
-        var functionStreamLength = 0;
-        FasStreamLoad(ref FunctionData, ".fct", ref functionStreamLength, ref FunctionStreamVars, ref CodeStartOffset);
+        byte[] functionData = Array.Empty<byte>();
+        int functionStreamLength = 0;
+        int functionStreamVars = 0;
+        long codeStartOffset = 0;
+        FasStreamLoad(ref functionData, ".fct", ref functionStreamLength, ref functionStreamVars, ref codeStartOffset);
+        FunctionData = functionData;
+        FunctionStreamVars = functionStreamVars;
+        CodeStartOffset = codeStartOffset;
         Console.WriteLine($"[FasFileReader] Function stream loaded: {functionStreamLength} bytes");
 
         // Load resource stream
-        var resourceStreamLength = 0;
-        FasStreamLoad(ref ResourceData, ".res", ref resourceStreamLength, ref ResourceStreamVars, ref DataStartOffset);
+        byte[] resourceData = Array.Empty<byte>();
+        int resourceStreamLength = 0;
+        int resourceStreamVars = 0;
+        long dataStartOffset = 0;
+        FasStreamLoad(ref resourceData, ".res", ref resourceStreamLength, ref resourceStreamVars, ref dataStartOffset);
+        ResourceData = resourceData;
+        ResourceStreamVars = resourceStreamVars;
+        DataStartOffset = dataStartOffset;
         Console.WriteLine($"[FasFileReader] Resource stream loaded: {resourceStreamLength} bytes");
     }
 
@@ -265,13 +276,25 @@ public class FasFileReader : IDisposable
         }
 
         // Load function stream
-        var functionStreamLength = 0;
-        FslStreamLoad(ref FunctionData, ".fct", ref functionStreamLength, ref FunctionStreamVars, ref CodeStartOffset);
+        byte[] functionData = Array.Empty<byte>();
+        int functionStreamLength = 0;
+        int functionStreamVars = 0;
+        long codeStartOffset = 0;
+        FslStreamLoad(ref functionData, ".fct", ref functionStreamLength, ref functionStreamVars, ref codeStartOffset);
+        FunctionData = functionData;
+        FunctionStreamVars = functionStreamVars;
+        CodeStartOffset = codeStartOffset;
         Console.WriteLine($"[FasFileReader] Function stream loaded: {functionStreamLength} bytes");
 
         // Load resource stream
-        var resourceStreamLength = 0;
-        FslStreamLoad(ref ResourceData, ".res", ref resourceStreamLength, ref ResourceStreamVars, ref DataStartOffset);
+        byte[] resourceData = Array.Empty<byte>();
+        int resourceStreamLength = 0;
+        int resourceStreamVars = 0;
+        long dataStartOffset = 0;
+        FslStreamLoad(ref resourceData, ".res", ref resourceStreamLength, ref resourceStreamVars, ref dataStartOffset);
+        ResourceData = resourceData;
+        ResourceStreamVars = resourceStreamVars;
+        DataStartOffset = dataStartOffset;
         Console.WriteLine($"[FasFileReader] Resource stream loaded: {resourceStreamLength} bytes");
     }
 
@@ -618,7 +641,8 @@ public class FasFileReader : IDisposable
         {
             if (disposing)
             {
-                _reader?.Dispose();
+                // Clean up managed resources if needed
+                _fileData = Array.Empty<byte>();
             }
             _disposed = true;
         }
