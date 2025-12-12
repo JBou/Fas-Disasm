@@ -150,6 +150,18 @@ public class FasDisassembler
                     DisassembleClearLocalVar(command, stream);
                     break;
 
+                case FasOpcode.CopyElement:
+                    DisassembleCopyElement(command, stream);
+                    break;
+
+                case FasOpcode.PushGlobalVarFsl:
+                    DisassemblePushGlobalVarFsl(command, stream);
+                    break;
+
+                case FasOpcode.PushStream:
+                    DisassemblePushStream(command, stream);
+                    break;
+
                 // Function definitions
                 case FasOpcode.Defun:
                 case FasOpcode.DefunQ:
@@ -234,30 +246,85 @@ public class FasDisassembler
                     DisassembleInitDone(command);
                     break;
 
-                // Arithmetic
-                case (FasOpcode)0x46:
-                case (FasOpcode)0x47:
-                case (FasOpcode)0x48:
-                case (FasOpcode)0x49:
-                case (FasOpcode)0x4A:
-                case (FasOpcode)0x4B:
-                case (FasOpcode)0x4C:
-                case (FasOpcode)0x4D:
-                case (FasOpcode)0x4E:
+                // List operations
+                case FasOpcode.GetFirst:
+                    DisassembleGetFirst(command);
+                    break;
+
+                case FasOpcode.GetRest:
+                    DisassembleGetRest(command);
+                    break;
+
+                case FasOpcode.Cons:
+                    DisassembleCons(command);
+                    break;
+
+                // Stack/logical operations
+                case FasOpcode.NullNot:
+                    DisassembleNullNot(command);
+                    break;
+
+                case FasOpcode.Convert:
+                    DisassembleConvert(command, stream);
+                    break;
+
+                case FasOpcode.ExitIfNotZero:
+                    DisassembleExitIfNotZero(command);
+                    break;
+
+                case FasOpcode.ExitIfZero:
+                    DisassembleExitIfZero(command);
+                    break;
+
+                case FasOpcode.ListStep:
+                    DisassembleListStep(command, stream);
+                    break;
+
+                case FasOpcode.Branch32:
+                    DisassembleBranch32(command, stream);
+                    break;
+
+                case FasOpcode.CopyStackToLocal:
+                    DisassembleCopyStackToLocal(command, stream);
+                    break;
+
+                case FasOpcode.EndDefunCleanup:
+                    DisassembleEndDefunCleanup(command);
+                    break;
+
+                // Arithmetic binary operations
+                case FasOpcode.Add:
+                case FasOpcode.Subtract:
+                case FasOpcode.Multiply:
+                case FasOpcode.Divide:
+                case FasOpcode.Equal:
+                case FasOpcode.NotEqual:
+                case FasOpcode.LessThan:
+                case FasOpcode.LessOrEqual:
+                case FasOpcode.GreaterThan:
                     DisassembleArithmeticBinary(command, opcode);
                     break;
 
-                case (FasOpcode)0x4F:
-                case (FasOpcode)0x50:
-                    DisassembleArithmeticUnary(command, opcode);
+                // Arithmetic unary operations
+                case FasOpcode.Minus:
+                    DisassembleMinus(command);
                     break;
 
-                // NOP and invalid
-                case (FasOpcode)0x20:
-                case (FasOpcode)0x62:
-                case (FasOpcode)0x63:
+                case FasOpcode.OneAdd:
+                    DisassembleOneAdd(command);
+                    break;
+
+                // NOP operations
+                case FasOpcode.Nop20:
+                case FasOpcode.Nop62:
+                case FasOpcode.Nop63:
                     command.DisassembledShort = "NOP";
-                    command.Disassembled = $"nop_{(char)command.Opcode}";
+                    command.Disassembled = $"nop (0x{command.Opcode:X2})";
+                    break;
+
+                // FSL-specific
+                case FasOpcode.JumpFsl:
+                    DisassembleJumpFsl(command, stream);
                     break;
 
                 default:
@@ -831,41 +898,239 @@ public class FasDisassembler
 
     private void DisassembleArithmeticBinary(FasCommand command, FasOpcode opcode)
     {
-        var op = (command.Opcode - 0x46) switch
+        var op = opcode switch
         {
-            0 => "+",
-            1 => "-",
-            2 => "*",
-            3 => "/",
-            4 => "mod",
-            5 => "<=",
-            6 => ">=",
-            7 => "<",
-            8 => ">",
+            FasOpcode.Add => "+",
+            FasOpcode.Subtract => "-",
+            FasOpcode.Multiply => "*",
+            FasOpcode.Divide => "/",
+            FasOpcode.Equal => "=",
+            FasOpcode.NotEqual => "/=",
+            FasOpcode.LessThan => "<",
+            FasOpcode.LessOrEqual => "<=",
+            FasOpcode.GreaterThan => ">",
             _ => "?"
         };
 
-        var args = _stack.PopArray(2);
-        var result = $"({op} {FormatValue(args[0])} {FormatValue(args[1])})";
+        var right = _stack.Pop();
+        var left = _stack.Pop();
+        var result = $"({op} {FormatValue(left)} {FormatValue(right)})";
 
         command.DisassembledShort = op;
         command.Disassembled = result;
         command.Description = $"Binary operation: {op}";
+        command.Interpreted = result;
 
         _stack.Push(result);
     }
 
-    private void DisassembleArithmeticUnary(FasCommand command, FasOpcode opcode)
+    private void DisassembleMinus(FasCommand command)
     {
-        var op = command.Opcode == 0x4F ? "1+" : "1-";
         var value = _stack.Pop();
-        var result = $"({op} {FormatValue(value)})";
+        var result = $"(- {FormatValue(value)})";
 
-        command.DisassembledShort = op;
+        command.DisassembledShort = "MINUS";
         command.Disassembled = result;
-        command.Description = $"Unary operation: {op}";
+        command.Description = "Unary minus";
+        command.Interpreted = result;
 
         _stack.Push(result);
+    }
+
+    private void DisassembleOneAdd(FasCommand command)
+    {
+        var value = _stack.Pop();
+        var result = $"(1+ {FormatValue(value)})";
+
+        command.DisassembledShort = "1+";
+        command.Disassembled = result;
+        command.Description = "Add 1";
+        command.Interpreted = result;
+
+        _stack.Push(result);
+    }
+
+    private void DisassembleGetFirst(FasCommand command)
+    {
+        var list = _stack.Pop();
+        var result = $"(car {FormatValue(list)})";
+
+        command.DisassembledShort = "car";
+        command.Disassembled = result;
+        command.Description = "Get first element of list (car)";
+        command.Interpreted = result;
+
+        _stack.Push(result);
+    }
+
+    private void DisassembleGetRest(FasCommand command)
+    {
+        var list = _stack.Pop();
+        var result = $"(cdr {FormatValue(list)})";
+
+        command.DisassembledShort = "cdr";
+        command.Disassembled = result;
+        command.Description = "Get rest of list (cdr)";
+        command.Interpreted = result;
+
+        _stack.Push(result);
+    }
+
+    private void DisassembleCons(FasCommand command)
+    {
+        var rest = _stack.Pop();
+        var first = _stack.Pop();
+        var result = $"(cons {FormatValue(first)} {FormatValue(rest)})";
+
+        command.DisassembledShort = "cons";
+        command.Disassembled = result;
+        command.Description = "Pops two elements and pushes a list (cons)";
+        command.Interpreted = result;
+
+        _stack.Push(result);
+    }
+
+    private void DisassembleNullNot(FasCommand command)
+    {
+        var value = _stack.Pop();
+        var result = $"(null {FormatValue(value)})";
+
+        command.DisassembledShort = "NULL/NOT";
+        command.Disassembled = $"null/not {FormatValue(value)}";
+        command.Description = "Null and Not";
+        command.Interpreted = result;
+
+        _stack.Push(result);
+    }
+
+    private void DisassembleConvert(FasCommand command, BinaryStreamReader stream)
+    {
+        var param = stream.ReadByte();
+        command.Parameters.Add(param);
+
+        var value = _stack.Pop();
+
+        command.DisassembledShort = "CONVERT";
+        command.Disassembled = $"convert {FormatValue(value)} (param={param})";
+        command.Description = "Convert last element on stack";
+
+        _stack.Push(value);
+    }
+
+    private void DisassembleExitIfNotZero(FasCommand command)
+    {
+        var value = _stack.Pop();
+
+        command.DisassembledShort = "EXIT_NZ";
+        command.Disassembled = $"exit if not zero: {FormatValue(value)}";
+        command.Description = "Pop and exit func if not zero";
+    }
+
+    private void DisassembleExitIfZero(FasCommand command)
+    {
+        var value = _stack.Pop();
+
+        command.DisassembledShort = "EXIT_Z";
+        command.Disassembled = $"exit if zero: {FormatValue(value)}";
+        command.Description = "Pop and exit func if zero";
+    }
+
+    private void DisassembleListStep(FasCommand command, BinaryStreamReader stream)
+    {
+        var offset = stream.ReadInt16();
+        command.Parameters.Add((byte)(offset & 0xFF));
+        command.Parameters.Add((byte)(offset >> 8));
+
+        var target = stream.Position + offset;
+
+        command.DisassembledShort = "LIST_STEP";
+        command.Disassembled = $"list step -> ${target:X4}";
+        command.Description = "Step through list";
+    }
+
+    private void DisassembleBranch32(FasCommand command, BinaryStreamReader stream)
+    {
+        var offset = stream.ReadInt32();
+        command.Parameters.Add((byte)(offset & 0xFF));
+        command.Parameters.Add((byte)((offset >> 8) & 0xFF));
+        command.Parameters.Add((byte)((offset >> 16) & 0xFF));
+        command.Parameters.Add((byte)((offset >> 24) & 0xFF));
+
+        var target = stream.Position + offset;
+
+        command.DisassembledShort = "Br32";
+        command.Disassembled = $"branch ${target:X4}";
+        command.Description = "Branch (32-bit offset)";
+    }
+
+    private void DisassembleCopyStackToLocal(FasCommand command, BinaryStreamReader stream)
+    {
+        var index = stream.ReadByte();
+        command.Parameters.Add(index);
+
+        command.DisassembledShort = "CPY_STK";
+        command.Disassembled = $"copy stack to L_{index}";
+        command.Description = "Copy stack to local var";
+    }
+
+    private void DisassembleEndDefunCleanup(FasCommand command)
+    {
+        command.DisassembledShort = "CLEANUP";
+        command.Disassembled = "end defun with cleanup";
+        command.Description = "End defun with cleanup";
+
+        _currentFunction = null;
+    }
+
+    private void DisassembleCopyElement(FasCommand command, BinaryStreamReader stream)
+    {
+        var from = stream.ReadByte();
+        var to = stream.ReadByte();
+        command.Parameters.Add(from);
+        command.Parameters.Add(to);
+
+        command.DisassembledShort = "COPY";
+        command.Disassembled = $"copy element from {from} to {to}";
+        command.Description = "Copy element from one index to another";
+    }
+
+    private void DisassemblePushGlobalVarFsl(FasCommand command, BinaryStreamReader stream)
+    {
+        var index = stream.ReadByte();
+        command.Parameters.Add(index);
+
+        var value = GetModuleVar(index);
+        command.DisassembledShort = "FSL_Push";
+        command.Disassembled = $"Push [{value}]";
+        command.Description = "FSL - Push global var onto stack";
+
+        _stack.Push(value);
+    }
+
+    private void DisassemblePushStream(FasCommand command, BinaryStreamReader stream)
+    {
+        var index = stream.ReadUInt16();
+        command.Parameters.Add((byte)(index & 0xFF));
+        command.Parameters.Add((byte)(index >> 8));
+
+        command.DisassembledShort = "STREAM";
+        command.Disassembled = $"Push stream reference {index}";
+        command.Description = "Push stream reference (FSL)";
+
+        _stack.Push($"<stream#{index}>");
+    }
+
+    private void DisassembleJumpFsl(FasCommand command, BinaryStreamReader stream)
+    {
+        var offset = stream.ReadInt16();
+        command.Parameters.Add((byte)(offset & 0xFF));
+        command.Parameters.Add((byte)(offset >> 8));
+
+        var target = stream.Position + offset;
+
+        command.DisassembledShort = "JMP_FSL";
+        command.Disassembled = $"jmp ${target:X4}";
+        command.Description = "FSL jump (16-bit offset)";
     }
 
     #endregion

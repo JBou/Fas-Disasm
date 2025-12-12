@@ -104,6 +104,20 @@ public partial class MainForm : Form
 
         dataGrid.DataSource = _commands;
 
+        // Add row coloring based on opcode
+        dataGrid.CellFormatting += (s, e) =>
+        {
+            if (e.RowIndex < 0 || e.RowIndex >= _commands.Count) return;
+
+            var item = _commands[e.RowIndex];
+            var color = item.GetColor();
+
+            if (color != Color.Black)
+            {
+                e.CellStyle.ForeColor = color;
+            }
+        };
+
         // Create decompiled output text box
         var decompiledTextBox = new TextBox
         {
@@ -362,4 +376,13 @@ public class CommandListItem
     public string Stack => _command.StackPointerAfter.ToString();
     public string Disasm => _command.Disassembled;
     public string Decompiled => _command.Interpreted;
+
+    /// <summary>
+    /// Gets the display color for this command based on its opcode.
+    /// </summary>
+    public Color GetColor()
+    {
+        var fasOpcode = (FasOpcode)_command.Opcode;
+        return fasOpcode.GetColor();
+    }
 }
