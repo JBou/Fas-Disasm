@@ -46,7 +46,6 @@ public static class LispFormatter
             IFasType fasType => fasType.ToLispString(),
             string s => s,
             IEnumerable<object?> enumerable => FormatList(enumerable),
-            object[] array => FormatList(array),
             _ => value.ToString() ?? "nil"
         };
     }

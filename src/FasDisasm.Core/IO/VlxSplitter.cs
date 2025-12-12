@@ -1,3 +1,5 @@
+using FasDisasm.Core.Disassembly;
+
 namespace FasDisasm.Core.IO;
 
 /// <summary>

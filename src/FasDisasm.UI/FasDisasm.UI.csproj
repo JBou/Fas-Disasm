@@ -13,6 +13,8 @@
     <Authors>FasDisasm Contributors</Authors>
     <Description>FAS/FSL (Visual Lisp) File Disassembler</Description>
     <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+    <!-- Enable cross-compilation on non-Windows systems -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
   <ItemGroup>
