@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>FasDisasm.UI</RootNamespace>
+    <AssemblyName>FasDisasm</AssemblyName>
+    <Version>2.0.0</Version>
+    <Authors>FasDisasm Contributors</Authors>
+    <Description>FAS/FSL (Visual Lisp) File Disassembler</Description>
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FasDisasm.Core\FasDisasm.Core.csproj" />
+  </ItemGroup>
+
+</Project>
