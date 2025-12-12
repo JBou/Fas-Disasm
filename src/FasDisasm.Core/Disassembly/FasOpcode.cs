@@ -39,10 +39,15 @@ public enum FasOpcode : byte
     // Stack cleanup
     EndDefunCleanup = 0x21,  // End defun with cleanup
 
+    // Integers
+    LoadInt8 = 0x32,         // Load 8-bit signed integer
+    LoadInt32 = 0x33,        // Load 32-bit signed integer
+
     // Function calls
     Eval = 0x34,             // Evaluate expression
     LoadUsubr = 0x35,        // Load user subroutine
-    LoadInt8 = 0x3B,         // Load 8-bit integer
+    DefineUsubr = 0x3A,      // Define user subroutine (register function from stack)
+    LoadReal = 0x3B,         // Load floating-point number
     BranchIfFalse16_2 = 0x3C, // Branch if false (variant)
     BranchIfTrue16_2 = 0x3D, // Branch if true (variant)
     ExitIfNotZero = 0x3E,    // Exit function if not zero

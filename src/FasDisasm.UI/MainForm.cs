@@ -86,16 +86,21 @@ public partial class MainForm : Form
             RowHeadersVisible = false,
             BackgroundColor = Color.White,
             BorderStyle = BorderStyle.None,
-            Font = new Font("Consolas", 9),
-            DoubleBuffered = true
+            Font = new Font("Consolas", 9)
         };
 
-        dataGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Offset", HeaderText = "Offset", Width = 70 });
-        dataGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Opcode", HeaderText = "Cmd", Width = 40 });
-        dataGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Params", HeaderText = "Parameters", Width = 100 });
-        dataGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Stack", HeaderText = "SP", Width = 40 });
-        dataGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Disasm", HeaderText = "Disassembly", Width = 300, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
-        dataGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Decompiled", HeaderText = "Decompiled", Width = 400, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+        // Enable double buffering via reflection (DoubleBuffered is protected)
+        typeof(DataGridView).InvokeMember("DoubleBuffered",
+            System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+            null, dataGrid, new object[] { true });
+
+        // Add columns with proper DataPropertyName binding
+        dataGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Offset", HeaderText = "Offset", DataPropertyName = "Offset", Width = 70 });
+        dataGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Opcode", HeaderText = "Cmd", DataPropertyName = "Opcode", Width = 40 });
+        dataGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Params", HeaderText = "Parameters", DataPropertyName = "Params", Width = 100 });
+        dataGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Stack", HeaderText = "SP", DataPropertyName = "Stack", Width = 40 });
+        dataGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Disasm", HeaderText = "Disassembly", DataPropertyName = "Disasm", Width = 300, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+        dataGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Decompiled", HeaderText = "Decompiled", DataPropertyName = "Decompiled", Width = 400, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
 
         dataGrid.DataSource = _commands;
 
@@ -172,8 +177,10 @@ public partial class MainForm : Form
 
     private async void LoadFile(string fileName)
     {
-        var statusLabel = Controls.Find("statusLabel", true).FirstOrDefault() as ToolStripStatusLabel;
-        var progressBar = Controls.Find("progressBar", true).FirstOrDefault() as ToolStripProgressBar;
+        // Find status strip items (not Controls, they're ToolStripItems)
+        var statusStrip = Controls.OfType<StatusStrip>().FirstOrDefault();
+        var statusLabel = statusStrip?.Items["statusLabel"] as ToolStripStatusLabel;
+        var progressBar = statusStrip?.Items["progressBar"] as ToolStripProgressBar;
         var decompiledTextBox = Controls.Find("decompiledTextBox", true).FirstOrDefault() as TextBox;
 
         if (statusLabel == null || progressBar == null || decompiledTextBox == null) return;

@@ -48,6 +48,11 @@ public class FasDisassembler
     /// </summary>
     public void Disassemble(FasFileReader fileReader)
     {
+        Console.WriteLine("[FasDisassembler] Starting disassembly...");
+        Console.WriteLine($"[FasDisassembler] Module 0 vars: {fileReader.ModuleVars[0]?.Length ?? 0}");
+        Console.WriteLine($"[FasDisassembler] Module 1 vars: {fileReader.ModuleVars[1]?.Length ?? 0}");
+        Console.WriteLine($"[FasDisassembler] Resource data: {fileReader.ResourceData.Length} bytes");
+
         _moduleVars0 = fileReader.ModuleVars[0];
         _moduleVars1 = fileReader.ModuleVars[1];
         _currentModule = 0;
@@ -58,7 +63,10 @@ public class FasDisassembler
 
         // Disassemble resource stream (init/main)
         using var resourceStream = fileReader.CreateResourceStream();
+        Console.WriteLine($"[FasDisassembler] Disassembling resource stream ({resourceStream.Length} bytes)...");
         DisassembleStream(resourceStream, resourceStream.Length);
+
+        Console.WriteLine($"[FasDisassembler] Disassembly complete. {_commands.Count} commands, {_functions.Count} functions found.");
     }
 
     /// <summary>
@@ -179,6 +187,11 @@ public class FasDisassembler
                     DisassembleAnd(command, stream);
                     break;
 
+                // Function definition (register function)
+                case FasOpcode.DefineUsubr:
+                    DisassembleDefineUsubr(command);
+                    break;
+
                 // Function calls
                 case FasOpcode.LoadUsubr:
                 case FasOpcode.AcadFunc:
@@ -201,7 +214,15 @@ public class FasDisassembler
                     break;
 
                 case FasOpcode.LoadInt8:
-                    DisassembleLoadInt(command, stream);
+                    DisassembleLoadInt8(command, stream);
+                    break;
+
+                case FasOpcode.LoadInt32:
+                    DisassembleLoadInt32(command, stream);
+                    break;
+
+                case FasOpcode.LoadReal:
+                    DisassembleLoadReal(command, stream);
                     break;
 
                 // Module initialization
@@ -481,6 +502,45 @@ public class FasDisassembler
         _currentFunction = null;
     }
 
+    /// <summary>
+    /// Disassembles opcode 0x3A - Define user subroutine (register function from stack).
+    /// Pops: Name, StartOffset, Module from stack.
+    /// </summary>
+    private void DisassembleDefineUsubr(FasCommand command)
+    {
+        // Pop parameters from stack (Name, StartOffset, Module)
+        var name = _stack.Pop();
+        var startOffset = _stack.Pop();
+        var module = _stack.Pop();
+
+        var funcName = FormatValue(name);
+        var offset = startOffset is FasInt fi ? (int)fi.Value : 0;
+        var moduleId = module is FasNil ? 0 : 1;
+
+        command.DisassembledShort = "ld_USUBR";
+        command.Disassembled = $"def_Func {funcName} Modul:{moduleId}, Offs: ${offset:X4} [{offset}]";
+        command.Description = "Load user subroutine from stream => GVar; 3x Stack";
+
+        // Create and register the function
+        var func = new FasFunction
+        {
+            Name = funcName,
+            StartOffset = offset,
+            ModuleId = moduleId
+        };
+
+        var key = offset.ToString();
+        if (!_functions.ContainsKey(key))
+        {
+            _functions[key] = func;
+            Console.WriteLine($"[FasDisassembler] Registered function: {funcName} at offset ${offset:X4}");
+        }
+
+        // Push result (USUBR) onto stack
+        var usubr = new FasUsubr(funcName, offset);
+        _stack.Push(usubr);
+    }
+
     private void DisassembleBranchIfFalse16(FasCommand command, BinaryStreamReader stream)
     {
         var offset = stream.ReadInt16();
@@ -665,55 +725,68 @@ public class FasDisassembler
         _stack.Push(list);
     }
 
-    private void DisassembleLoadInt(FasCommand command, BinaryStreamReader stream)
+    /// <summary>
+    /// Disassembles opcode 0x32 - Load 8-bit signed integer.
+    /// </summary>
+    private void DisassembleLoadInt8(FasCommand command, BinaryStreamReader stream)
     {
-        // Read size indicator
-        var sizeType = stream.ReadByte();
-        command.Parameters.Add(sizeType);
+        var value = stream.ReadSByte();
+        command.Parameters.Add((byte)value);
 
-        long value;
-        int size;
+        var fasInt = new FasInt(value, 1);
 
-        if (sizeType < 0x80)
-        {
-            // Small integer, value is the sizeType itself
-            value = sizeType;
-            size = 1;
-        }
-        else
-        {
-            // Larger integer
-            size = (sizeType & 0x0F) switch
-            {
-                1 => 1,
-                2 => 2,
-                4 => 4,
-                8 => 8,
-                _ => 4
-            };
-
-            value = size switch
-            {
-                1 => stream.ReadSByte(),
-                2 => stream.ReadInt16(),
-                4 => stream.ReadInt32(),
-                8 => stream.ReadInt64(),
-                _ => 0
-            };
-
-            for (int i = 0; i < size; i++)
-            {
-                command.Parameters.Add((byte)((value >> (i * 8)) & 0xFF));
-            }
-        }
-
-        var fasInt = new FasInt(value, size);
-
-        command.DisassembledShort = "ld_INT";
-        command.Disassembled = $"Push {value}";
-        command.Description = "Load integer literal";
+        command.DisassembledShort = "Ld_INT8";
+        command.Disassembled = $"push {value:00}";
+        command.Description = "Push signed 8-bit integer from stream => stack";
 
         _stack.Push(fasInt);
+    }
+
+    /// <summary>
+    /// Disassembles opcode 0x33 - Load 32-bit signed integer.
+    /// </summary>
+    private void DisassembleLoadInt32(FasCommand command, BinaryStreamReader stream)
+    {
+        var value = stream.ReadInt32();
+        command.Parameters.Add((byte)(value & 0xFF));
+        command.Parameters.Add((byte)((value >> 8) & 0xFF));
+        command.Parameters.Add((byte)((value >> 16) & 0xFF));
+        command.Parameters.Add((byte)((value >> 24) & 0xFF));
+
+        var fasInt = new FasInt(value, 4);
+
+        command.DisassembledShort = "Ld_INT32";
+        command.Disassembled = $"push {value}";
+        command.Description = "Push signed 32-bit integer from stream => stack";
+
+        _stack.Push(fasInt);
+    }
+
+    /// <summary>
+    /// Disassembles opcode 0x3B - Load floating-point (real) number.
+    /// The number is stored as a zero-terminated string.
+    /// </summary>
+    private void DisassembleLoadReal(FasCommand command, BinaryStreamReader stream)
+    {
+        // Read null-terminated string representing the real number
+        var sb = new System.Text.StringBuilder();
+        byte b;
+        while ((b = stream.ReadByte()) != 0 && !stream.EndOfStream)
+        {
+            sb.Append((char)b);
+        }
+
+        var realStr = sb.ToString();
+        double.TryParse(realStr, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var realValue);
+
+        var fasReal = new FasReal(realValue);
+
+        command.DisassembledShort = "Ld_REAL";
+        command.Disassembled = $"push {realStr}";
+        command.Description = "Push floating-point number string from stream => stack";
+
+        _stack.Push(fasReal);
     }
 
     private void DisassembleInitModuleVars(FasCommand command, BinaryStreamReader stream)
