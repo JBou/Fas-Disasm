@@ -52,7 +52,10 @@ Public Property Get Current() ' As String
       Dim Errmsg$
       
       If esp <= 0 Then
-         Errmsg = "Stack is empty.   Requested SP: " & esp
+         ' Graceful underflow handling for parser recovery paths.
+         ' Returning empty keeps disassembly running; strict underflow checks remain in pop().
+         Current = ""
+         Exit Property
       Else
          Errmsg = "Stackpointer esp=" & esp & " out of range."
        End If
@@ -108,7 +111,7 @@ push_err:
    '   Else
   '       Stop
  '     End If
-    Case 9: 'Index außerhalb des gültigen Bereichs
+    Case 9: 'Index auï¿½erhalb des gï¿½ltigen Bereichs
       If esp > 0 Then
         Storage.add "FillData"
       ElseIf esp = 0 Then
@@ -153,7 +156,7 @@ Property Get pop() As Variant
 pop_err:
 Select Case Err
     Case 0:
-    Case 9: 'Index außerhalb des gültigen Bereichs
+    Case 9: 'Index auï¿½erhalb des gï¿½ltigen Bereichs
 '        If ESP <= STACK_MIN Then ESP = STACK_MIN
 '->note for developer
 ' rightclick  Select "switch" -> "don't stop when errors"
