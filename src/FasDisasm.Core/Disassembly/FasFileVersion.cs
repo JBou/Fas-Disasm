@@ -20,6 +20,9 @@ public enum FasFileVersion
     /// <summary>FAS4 format.</summary>
     Fas4,
 
+    /// <summary>FAS5 format (AutoCAD 2021+).</summary>
+    Fas5,
+
     /// <summary>FSL format (compiled Lisp).</summary>
     Fsl,
 
@@ -42,6 +45,7 @@ public static class FasFileSignatures
     public const string Fas2 = "FAS2-FILE";
     public const string Fas3 = "FAS3-FILE";
     public const string Fas4 = "FAS4-FILE";
+    public const string Fas5 = "FAS5-FILE";
     public const string Fsl = "1Y";
     public const string LtFas = "AutoCAD LT OEM Product";
     public const string Vlx = "VRTLIB";
@@ -56,6 +60,8 @@ public static class FasFileSignatures
 
         var headerStr = System.Text.Encoding.ASCII.GetString(header);
 
+        if (headerStr.StartsWith(Fas5))
+            return FasFileVersion.Fas5;
         if (headerStr.StartsWith(Fas4))
             return FasFileVersion.Fas4;
         if (headerStr.StartsWith(Fas3))

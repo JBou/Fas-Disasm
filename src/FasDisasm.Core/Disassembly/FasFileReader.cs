@@ -21,6 +21,7 @@ public class FasFileReader : IDisposable
 
     // File signatures
     private const string FAS4_FILE_SIGNATURE = "FAS4-FILE";
+    private const string FAS5_FILE_SIGNATURE = "FAS5-FILE";
     private const string FAS3_FILE_SIGNATURE = "FAS3-FILE";
     private const string FAS2_FILE_SIGNATURE = "FAS2-FILE";
     private const string FAS_FILE_SIGNATURE = "FAS-FILE";
@@ -229,6 +230,7 @@ public class FasFileReader : IDisposable
         // Determine version
         Version = fileSig switch
         {
+            FAS5_FILE_SIGNATURE => FasFileVersion.Fas5,
             FAS4_FILE_SIGNATURE => FasFileVersion.Fas4,
             FAS3_FILE_SIGNATURE => FasFileVersion.Fas3,
             FAS2_FILE_SIGNATURE => FasFileVersion.Fas2,
