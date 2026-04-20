@@ -755,45 +755,63 @@ public class FasDisassembler
 
     private void DisassembleLoadString(FasCommand command, BinaryStreamReader stream)
     {
-        var length = stream.ReadByte();
-        command.Parameters.Add(length);
+        var stringCount = stream.ReadUInt16();
+        command.Parameters.Add((byte)(stringCount & 0xFF));
+        command.Parameters.Add((byte)(stringCount >> 8));
 
-        var str = stream.ReadFixedString(length);
-        var fasStr = new FasString(str);
+        var strings = new List<string>();
+        for (int i = 0; i < stringCount; i++)
+        {
+            var strLen = stream.ReadUInt16();
+            var str = stream.ReadFixedString(strLen);
+            strings.Add(str);
 
-        command.DisassembledShort = "ld_STR";
-        command.Disassembled = $"Push {fasStr.ToLispString()}";
-        command.Description = "Load string literal";
+            var fasStr = new FasString(str);
+            _stack.Push(fasStr);
+        }
 
-        _stack.Push(fasStr);
+        command.DisassembledShort = "Ld_STR";
+        command.Disassembled = strings.Count == 1
+            ? $"Push \"{strings[0]}\""
+            : $"Combines {strings.Count} elements on the stack to a LIST";
+        command.Description = "Combines strings from stream => stack";
     }
 
     private void DisassembleLoadSymbol(FasCommand command, BinaryStreamReader stream)
     {
-        var length = stream.ReadByte();
-        command.Parameters.Add(length);
+        var names = new List<string>();
 
-        var name = stream.ReadFixedString(length);
-        var symbol = new FasSymbol(name);
+        while (true)
+        {
+            var name = stream.ReadNullTerminatedString();
+            if (string.IsNullOrEmpty(name))
+                break;
 
-        command.DisassembledShort = "ld_SYM";
-        command.Disassembled = $"Push symbol '{name}'";
-        command.Description = "Load symbol";
+            names.Add(name);
 
-        _stack.Push(symbol);
+            var symbol = new FasSymbol(name);
+            _stack.Push(symbol);
+        }
+
+        command.DisassembledShort = "Ld_SYM";
+        command.Disassembled = names.Count > 0
+            ? $"Push&load Symbols"
+            : "Push&load Symbols (empty)";
+        command.Description = "Push&load Symbols";
     }
 
     private void DisassembleLoadList(FasCommand command, BinaryStreamReader stream)
     {
-        var count = stream.ReadByte();
-        command.Parameters.Add(count);
+        var count = stream.ReadUInt16();
+        command.Parameters.Add((byte)(count & 0xFF));
+        command.Parameters.Add((byte)(count >> 8));
 
         // Pop items from stack to form the list
         var items = _stack.PopArray(count);
         var list = new FasList(items);
 
-        command.DisassembledShort = "ld_LIST";
-        command.Disassembled = $"Create list with {count} items";
+        command.DisassembledShort = "Ld_LIST";
+        command.Disassembled = $"Combines {count} elements on the stack to a LIST";
         command.Description = "Load list";
 
         _stack.Push(list);
