@@ -17,6 +17,8 @@ Option Explicit
 
 Private mListView As ListView
 Private Const VisibleLinesAbove& = 8
+Private mDupOffsetKeys As Collection
+Private mDupKeySeq As Long
 
 
 
@@ -89,6 +91,8 @@ End Sub
 
 Public Sub Create(ListView As ListView)
    Set mListView = ListView
+   Set mDupOffsetKeys = New Collection
+   mDupKeySeq = 0
 End Sub
 
 
@@ -112,17 +116,60 @@ Public Static Property Get OffsetKeyGet(ModulId, offset) As ListItem
 '   Dim FasCommando As FasCommando
 '   Set FasCommando = li.Tag
 
-   Set OffsetKeyGet = mListView.ListItems(offset_enc(offset, ModulId))
+   Dim keyBase
+   keyBase = offset_enc(offset, ModulId)
+
+   If KeyIsMarkedDuplicate(CStr(keyBase)) Then
+      Err.Raise 5, "Ext_ListView.OffsetKeyGet", "Duplicate offset key is not jumpable"
+   End If
+
+   Set OffsetKeyGet = mListView.ListItems(keyBase)
 End Property
 
 Public Static Property Let OffsetKey(li As ListItem, ModulId, offset)
 '
 '   Dim FasCommando As FasCommando
 '   Set FasCommando = li.Tag
-   li.Key = offset_enc(offset, ModulId)
+
+   Dim keyBase$
+   keyBase = CStr(offset_enc(offset, ModulId))
+
+   If LenB(keyBase) = 0 Then Exit Property
+
+   On Error GoTo makeUnique
+   li.Key = keyBase
+   On Error GoTo 0
+   Exit Property
+
+makeUnique:
+   MarkKeyAsDuplicate keyBase
+
+   Err.Clear
+   mDupKeySeq = mDupKeySeq + 1
+   li.Key = keyBase & "#dup" & CStr(mDupKeySeq)
+   On Error GoTo 0
 
 End Property
 
+Private Function KeyIsMarkedDuplicate(ByVal keyBase$) As Boolean
+   If mDupOffsetKeys Is Nothing Then Exit Function
+
+   On Error Resume Next
+   Dim marker
+   marker = mDupOffsetKeys(keyBase)
+   KeyIsMarkedDuplicate = (Err.Number = 0)
+   Err.Clear
+   On Error GoTo 0
+End Function
+
+Private Sub MarkKeyAsDuplicate(ByVal keyBase$)
+   If mDupOffsetKeys Is Nothing Then Set mDupOffsetKeys = New Collection
+
+   On Error Resume Next
+   mDupOffsetKeys.Add True, keyBase
+   Err.Clear
+   On Error GoTo 0
+End Sub
 
 
 
