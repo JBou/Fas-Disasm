@@ -94,8 +94,8 @@ Private Const WS_CONTROLCHAR = 0      'Chr( 0..8,b,e,f)...
 Private Const WS_WHITESPACE = 1 '     Tab,LF,NewLine,CR,1A,Space
 Private Const WS_BLACKSLASH = 4 '      \
 Private Const WS_PIPE = 5 '            |
-Private Const WS_ALPHANUMMERIC = &HA ' $0123456789ABCD…
-Private Const WS_LIMITER = &HB '       !"'(),;?´{}~
+Private Const WS_ALPHANUMMERIC = &HA ' $0123456789ABCDï¿½
+Private Const WS_LIMITER = &HB '       !"'(),;?ï¿½{}~
 Private Const WS_DASH = &HF '          #
 Private WHITESPACETABLE
 
@@ -408,11 +408,12 @@ On Error Resume Next
    
    FasFuncCurrent.LocalVars(idx) = NewValue
    If Err Then
+      Err.Clear
       Dim New_LVars As Fas_LVar
       Set New_LVars = New Fas_LVar
-      New_LVars.value = idx
+      New_LVars.value = NewValue
       
-      Set FasFuncCurrent.LocalVars(idx) = New_LVars
+      FasFuncCurrent.LocalVars(idx) = New_LVars.value
    End If
    
    
@@ -725,10 +726,12 @@ On Error GoTo InterpretStream_rek_err
                   FasFuncCurrent.FuncName = "fs_init"
                   
                   Dim Arg1$
-                  Arg1 = "funcStream"
-                  FasFuncCurrent.Args.add Arg1
-                  
-                  LVars(0) = Arg1
+                 Arg1 = "funcStream"
+                 FasFuncCurrent.Args.add Arg1
+                 
+               ' Ensure locals exist before first assignment
+                 FasFuncCurrent.MakeLVars p1_LVrs, IIf(isFas, "_FAS", "_FSL")
+                 LVars(0) = Arg1
                   
                Else
                
@@ -2896,7 +2899,7 @@ Select Case Err
 
       
       Resume Next
-'   Case 9 'Index außerhalb des gültigen Bereichs
+'   Case 9 'Index auï¿½erhalb des gï¿½ltigen Bereichs
 '      Resume Next
    Case &H800403E9
    
