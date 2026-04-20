@@ -80,6 +80,13 @@ public class FasDisassembler
             if (command != null)
             {
                 _commands.Add(command);
+
+                // Add interpreted line to DecompiledLines if it has content
+                if (!string.IsNullOrEmpty(command.Interpreted))
+                {
+                    DecompiledLines.Add(GetIndent() + command.Interpreted);
+                }
+
                 CommandDisassembled?.Invoke(this, command);
             }
 

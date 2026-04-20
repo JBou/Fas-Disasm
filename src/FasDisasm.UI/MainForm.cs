@@ -249,6 +249,9 @@ public partial class MainForm : Form
             decompiledTextBox.Text = string.Join(Environment.NewLine,
                 _disassembler?.DecompiledLines ?? Enumerable.Empty<string>());
 
+            // Automatically export decompiled and disassembly files
+            AutoExportFiles(fileName);
+
             Text = $"FAS Disassembler - {Path.GetFileName(fileName)}";
             statusLabel.Text = $"Loaded: {_commands.Count} commands from {Path.GetFileName(fileName)}";
         }
@@ -313,6 +316,37 @@ public partial class MainForm : Form
 
             File.WriteAllLines(dialog.FileName, lines);
             MessageBox.Show($"Exported to {dialog.FileName}", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+    }
+
+    private void AutoExportFiles(string sourceFileName)
+    {
+        try
+        {
+            var baseName = Path.Combine(
+                Path.GetDirectoryName(sourceFileName) ?? ".",
+                Path.GetFileNameWithoutExtension(sourceFileName));
+
+            // Export decompiled code (.lsp)
+            if (_disassembler?.DecompiledLines.Count > 0)
+            {
+                var lspPath = baseName + "_.lsp";
+                File.WriteAllLines(lspPath, _disassembler.DecompiledLines);
+            }
+
+            // Export disassembly (.disasm.txt)
+            if (_commands.Count > 0)
+            {
+                var disasmPath = baseName + ".disasm.txt";
+                var lines = _commands.Select(c =>
+                    $"{c.Offset}\t{c.Opcode}\t{c.Params,-12}\t{c.Stack}\t{c.Disasm}\t{c.Decompiled}");
+                File.WriteAllLines(disasmPath, lines);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Silently ignore auto-export errors - don't disrupt the user experience
+            Console.WriteLine($"Auto-export error: {ex.Message}");
         }
     }
 
